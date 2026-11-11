@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import json
+import time
 from html import escape
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -132,6 +133,7 @@ API_URL = (
     "https://in.bookmyshow.com/api/movies-data/v4/"
     "showtimes-by-event/primary-dynamic"
 )
+RETRY_DELAYS = [15, 30]  # seconds to wait before each retry on 403/errors
 
 
 def fetch_bms(event_code, date_code, region_code, region_slug,
@@ -169,14 +171,18 @@ def fetch_bms(event_code, date_code, region_code, region_slug,
         "memberId": "", "lsId": "", "subCode": "",
         "lat": lat, "lon": lon,
     }
-    try:
-        resp = requests.get(API_URL, headers=headers,
-                            params=params, timeout=15)
-        if resp.status_code == 200:
-            return resp.json()
-        print(f"  HTTP {resp.status_code}: {resp.text[:200]!r}")
-    except requests.RequestException as e:
-        print(f"  Request failed: {e}")
+    for delay in [0] + RETRY_DELAYS:
+        if delay:
+            print(f"  Retrying in {delay}s...")
+            time.sleep(delay)
+        try:
+            resp = requests.get(API_URL, headers=headers,
+                                params=params, timeout=15)
+            if resp.status_code == 200:
+                return resp.json()
+            print(f"  HTTP {resp.status_code}")
+        except requests.RequestException as e:
+            print(f"  Request failed: {e}")
     return None
 
 
@@ -575,9 +581,11 @@ def main():
         all_dates.extend(parse_dates(data))
         all_shows.extend(parse_shows(data))
 
-    # Fail loudly so a blocked check isn't mistaken for "no changes"
-    if not fetched:
-        print("  ❌ Could not fetch any data from BookMyShow (blocked or down).")
+    # Fail loudly so a blocked check isn't mistaken for "no changes", and
+    # don't save partial state (missing dates would later look like new shows)
+    if fetched < len(date_list):
+        print(f"  ❌ Fetched {fetched}/{len(date_list)} dates from BookMyShow "
+              "(blocked or down). State not updated.")
         sys.exit(1)
 
     if not all_shows:
