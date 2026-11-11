@@ -600,6 +600,9 @@ def main():
     if old_state:
         changes = detect_changes(old_state, new_state)
 
+    if os.getenv("BMS_TEST_EMAIL", "").lower() == "true":
+        changes.append("🧪 TEST: manual test email — alerts are working")
+
     save_state(new_state)
 
     if changes:
