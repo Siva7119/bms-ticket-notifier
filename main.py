@@ -69,6 +69,7 @@ REGION_MAP = {
     "kolkata":    ("KOLK",   "kolkata",    "22.573", "88.364", "tun"),
     "pune":       ("PUNE",   "pune",       "18.520", "73.856", "te2"),
     "kochi":      ("KOCH",   "kochi",      "9.932",  "76.267", "t9z"),
+    "madurai":    ("MADU",   "madurai",    "9.925",  "78.120", "t9z"),
 }
 
 
@@ -586,6 +587,10 @@ def main():
         CONFIG["dates"],
     )
     print(f"  📊 {len(filtered)} showtime(s) after filters")
+
+    # Only track monitored dates, so other dates opening don't trigger alerts
+    if raw_dates:
+        all_dates = [d for d in all_dates if d.date_code in date_list]
 
     # Build state & detect changes
     new_state = build_state(filtered, all_dates)
