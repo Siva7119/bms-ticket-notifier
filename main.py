@@ -565,26 +565,35 @@ def main():
     all_shows = []
     all_dates = []
     movie_info = {"name": "Unknown", "language": ""}
-    fetched = 0
+    failed = 0
+    known_dates = {}
 
     for dc in date_list:
+        # A not-yet-open date just returns the default date's shows, so skip
+        # the request (fewer requests = less chance of being blocked)
+        if known_dates.get(dc) == "NOT_OPEN":
+            print(f"  ⏭️  {dc} not open yet, skipping fetch")
+            continue
+
         data = fetch_bms(event_code, dc, region_code,
                          region_slug_r, lat, lon, geohash)
         if not data:
             print(f"  ⚠️  No data for date {dc or '(default)'}")
+            failed += 1
             continue
-        fetched += 1
 
         if movie_info["name"] == "Unknown":
             movie_info = parse_movie_info(data)
 
-        all_dates.extend(parse_dates(data))
+        dates = parse_dates(data)
+        known_dates.update({d.date_code: d.status for d in dates})
+        all_dates.extend(dates)
         all_shows.extend(parse_shows(data))
 
     # Fail loudly so a blocked check isn't mistaken for "no changes", and
     # don't save partial state (missing dates would later look like new shows)
-    if fetched < len(date_list):
-        print(f"  ❌ Fetched {fetched}/{len(date_list)} dates from BookMyShow "
+    if failed:
+        print(f"  ❌ {failed} request(s) to BookMyShow failed "
               "(blocked or down). State not updated.")
         sys.exit(1)
 
