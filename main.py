@@ -174,7 +174,7 @@ def fetch_bms(event_code, date_code, region_code, region_slug,
                             params=params, timeout=15)
         if resp.status_code == 200:
             return resp.json()
-        print(f"  HTTP {resp.status_code}")
+        print(f"  HTTP {resp.status_code}: {resp.text[:200]!r}")
     except requests.RequestException as e:
         print(f"  Request failed: {e}")
     return None
@@ -559,6 +559,7 @@ def main():
     all_shows = []
     all_dates = []
     movie_info = {"name": "Unknown", "language": ""}
+    fetched = 0
 
     for dc in date_list:
         data = fetch_bms(event_code, dc, region_code,
@@ -566,12 +567,18 @@ def main():
         if not data:
             print(f"  ⚠️  No data for date {dc or '(default)'}")
             continue
+        fetched += 1
 
         if movie_info["name"] == "Unknown":
             movie_info = parse_movie_info(data)
 
         all_dates.extend(parse_dates(data))
         all_shows.extend(parse_shows(data))
+
+    # Fail loudly so a blocked check isn't mistaken for "no changes"
+    if not fetched:
+        print("  ❌ Could not fetch any data from BookMyShow (blocked or down).")
+        sys.exit(1)
 
     if not all_shows:
         print("  ❌ No showtimes found.")
